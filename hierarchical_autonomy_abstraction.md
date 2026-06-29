@@ -29,7 +29,7 @@ An autonomy object is not an object in the object-oriented programming sense. It
 An autonomy object can be described as:
 
 ```text
-o = (R, D, A, C, E, Phi, Xi)
+o = (R, D, A, C, E, F, X)
 ```
 
 where:
@@ -39,8 +39,8 @@ where:
 - `A` is the action space: the actions the object may perform, request, block, or delegate.
 - `C` is the constraint space: the limits under which its decisions and actions remain valid.
 - `E` is the set of exposure functions: what the object reveals to other objects, depending on the target.
-- `Phi` is the refinement or delegation relation: how abstract commitments are translated into lower-level obligations.
-- `Xi` is the escalation policy: when the object must expose hidden distinctions, request help, transfer authority, or stop acting locally.
+- `F` is the refinement or delegation relation: how abstract commitments are translated into lower-level obligations.
+- `X` is the escalation policy: when the object must expose hidden distinctions, request help, transfer authority, or stop acting locally.
 
 The key idea is that autonomy is not the absence of constraint. Autonomy is local choice within a constrained abstraction.
 
@@ -189,7 +189,7 @@ Hierarchical systems are not merely chains of command, stacks of layers, or tree
 The proposed autonomy-object model provides a compact way to describe this structure:
 
 ```text
-o = (R, D, A, C, E, Phi, Xi)
+o = (R, D, A, C, E, F, X)
 S = (Obj, H, K)
 ```
 
