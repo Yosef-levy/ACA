@@ -115,6 +115,14 @@ class FormulaSatTests(unittest.TestCase):
         self.assertEqual(l2check.entailment_status(tight, loose, set()), "holds")
         self.assertEqual(l2check.entailment_status(loose, tight, set()), "fails")
 
+    def test_atom_cap_returns_unknown(self):
+        # More distinct atoms than the enumeration guard allows -> give up (None),
+        # rather than enumerate 2**n assignments.
+        names = [f"v{i}" for i in range(l2check._SAT_ATOM_CAP + 1)]
+        expr = " && ".join(f"{n} <= 1.0" for n in names)
+        formula = l2check.to_formula(l2check.celcheck.parse(expr), {}, set(names))
+        self.assertIsNone(l2check.formula_sat(formula))
+
 
 def _charter(cid, terms=None, constraints=None, delegation=None, exposure=None,
              success=None):
