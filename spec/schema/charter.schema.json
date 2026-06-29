@@ -216,7 +216,15 @@
           }
         },
         "reporting": { "type": "array", "items": { "$ref": "#/$defs/symbol" } },
-        "escalation_conditions": { "type": "array", "items": { "$ref": "#/$defs/celExpr" } }
+        "escalation_conditions": { "type": "array", "items": { "$ref": "#/$defs/celExpr" } },
+        "refinement": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "How the delegated commitment is discharged by the child. `assume` lists the guarantees the parent relies on, in its R extended with the delegation's `reporting` symbols; L2 checks that they entail the parent's `delegates` commitment.",
+          "properties": {
+            "assume": { "type": "array", "items": { "$ref": "#/$defs/celExpr" } }
+          }
+        }
       }
     },
     "escalation": {

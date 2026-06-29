@@ -109,24 +109,36 @@ class AtomExtractor:
         self.defs = defs  # predicate/success name -> body AST (for inlining)
         self.numeric = numeric_vars  # set of var names with a numeric CEL type
 
-    def extract(self, node, out, depth=0):
-        """Collect inequalities implied by a boolean expression into ``out``."""
+    def extract(self, node, out, depth=0, dropped=None):
+        """Collect inequalities implied by a boolean expression into ``out``.
+
+        When ``dropped`` is a list, any conjunct that falls outside the modelled
+        linear fragment is appended to it. A caller can therefore tell whether
+        the expression was modelled *exactly* (``dropped`` stayed empty) -- which
+        is what entailment reasoning requires to stay sound.
+        """
         node = self._inline(node, depth)
         if isinstance(node, Binary) and node.op == "&&":
-            self.extract(node.left, out, depth)
-            self.extract(node.right, out, depth)
+            self.extract(node.left, out, depth, dropped)
+            self.extract(node.right, out, depth, dropped)
             return
         if isinstance(node, Binary) and node.op == "||":
+            if dropped is not None:
+                dropped.append("||")
             return  # disjunction: not modelled, drop (conservative)
         if isinstance(node, Unary) and node.op == "!":
             neg = self._negate(node.operand, depth)
             if neg is not None:
-                self.extract(neg, out, depth)
+                self.extract(neg, out, depth, dropped)
+            elif dropped is not None:
+                dropped.append("!")
             return
         if isinstance(node, Binary) and node.op in ("<", "<=", ">", ">=", "=="):
-            self._emit_comparison(node, out)
+            self._emit_comparison(node, out, dropped)
             return
         # bare predicate identifier already inlined; anything else is opaque.
+        if dropped is not None:
+            dropped.append(node)
 
     def _inline(self, node, depth):
         """Replace a predicate/success identifier with its (parsed) body."""
@@ -141,11 +153,13 @@ class AtomExtractor:
             return Binary(flip, node.left, node.right)
         return None  # !=, !(a && b), opaque: drop
 
-    def _emit_comparison(self, node, out):
+    def _emit_comparison(self, node, out, dropped=None):
         try:
             left = self._linear(node.left)
             right = self._linear(node.right)
         except NonLinear:
+            if dropped is not None:
+                dropped.append(node)
             return
         diff = left.sub(right)  # left - right <op> 0
         op = node.op
@@ -209,6 +223,15 @@ class AtomExtractor:
 
 
 # --- Fourier-Motzkin satisfiability -----------------------------------------
+
+
+def negate(ineq: Ineq) -> Ineq:
+    """The logical negation of a single inequality.
+
+    ``e <= 0`` becomes ``e > 0`` (i.e. ``-e < 0``); ``e < 0`` becomes
+    ``-e <= 0``. Strictness flips.
+    """
+    return Ineq({v: -c for v, c in ineq.coeffs.items()}, -ineq.const, not ineq.strict)
 
 
 def _trivially_false(ineq: Ineq) -> bool:
@@ -396,9 +419,86 @@ def check_delegation_reporting(charters, errors):
                     )
 
 
+def check_delegation_entailment(charters, errors):
+    """L2d: assumed child guarantees must entail the parent's delegated commitment.
+
+    A delegation may carry ``refinement.assume`` -- the guarantees the parent
+    relies on the child to provide, written in the parent's R extended with the
+    delegation's ``reporting`` symbols. The parent's ``delegates`` symbol names a
+    commitment defined in the parent's R. This check verifies that the
+    assumptions *entail* the commitment: ``assume => delegates``.
+
+    Entailment ``A => B`` holds iff ``A and not B`` is unsatisfiable. Because the
+    satisfiability engine is conservative (it drops everything outside the linear
+    fragment), this check only runs when the assumptions are modelled *exactly*
+    (no dropped conjuncts). Under that condition both SAT and UNSAT verdicts are
+    sound, so a reported entailment failure is a genuine counterexample, not an
+    artefact of approximation. Commitments outside the linear fragment are simply
+    left unverified rather than flagged.
+    """
+    for parent in charters:
+        pid = parent["object"]["id"]
+        defs = _definitions(parent)
+        base_env = celcheck.build_env(parent)
+        for f in parent.get("delegation", []):
+            assume = (f.get("refinement") or {}).get("assume", [])
+            if not assume:
+                continue
+
+            env = celcheck.Env(
+                vars=dict(base_env.vars),
+                states=set(base_env.states),
+                enums=dict(base_env.enums),
+            )
+            for sym in f.get("reporting", []):
+                env.vars.setdefault(sym, celcheck.DYN)
+            numeric = _numeric_vars(env)
+            extractor = AtomExtractor(defs, numeric)
+
+            # Model the assumptions exactly; bail out if anything is dropped, so
+            # we never report a failure we cannot soundly justify.
+            assume_atoms = list(_range_bounds(parent, numeric))
+            modelled = True
+            for expr in assume:
+                try:
+                    ast = celcheck.parse(expr)
+                except celcheck.CelError:
+                    modelled = False
+                    break
+                dropped = []
+                extractor.extract(ast, assume_atoms, dropped=dropped)
+                if dropped:
+                    modelled = False
+                    break
+            if not modelled:
+                continue
+
+            # Model the delegated commitment. Dropping conjuncts here is safe:
+            # the real commitment is only *stronger*, so a counterexample to a
+            # modelled conjunct is a counterexample to the whole commitment.
+            body = defs.get(f.get("delegates"))
+            if body is None:
+                continue  # delegates is a bare term / not a named commitment
+            commit_atoms = []
+            extractor.extract(body, commit_atoms)
+            if not commit_atoms:
+                continue  # commitment not expressible in the linear fragment
+
+            for atom in commit_atoms:
+                if is_satisfiable(assume_atoms + [negate(atom)]):
+                    errors.append(
+                        f"{pid}: delegation of '{f['delegates']}' to "
+                        f"{sorted(f.get('to', []))} is under-refined: assumed "
+                        f"guarantees {list(assume)} do not entail "
+                        f"'{f['delegates']}'"
+                    )
+                    break
+
+
 def check_system(charters, errors):
     """Run all L2 checks over a fully-loaded set of charters."""
     for c in charters:
         check_satisfiability(c, errors)
     check_inherited_provenance(charters, errors)
     check_delegation_reporting(charters, errors)
+    check_delegation_entailment(charters, errors)

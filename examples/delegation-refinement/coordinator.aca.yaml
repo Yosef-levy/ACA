@@ -1,0 +1,24 @@
+aca_version: "0.1"
+kind: "Charter"
+object:
+  id: "coordinator"
+  role: "Survey Coordinator"
+
+# R - Representation space
+representation:
+  terms:
+    - { name: "hazard", type: "real", range: [0, 1] }
+  success:
+    # The commitment the coordinator owns and delegates downward.
+    - { name: "hazard_ok", expr: "hazard <= 0.2" }
+
+# F - Refinement / delegation relation
+delegation:
+  - delegates: "hazard_ok"
+    to: ["surveyor"]
+    objective: "keep the surveyed corridor below the hazard ceiling"
+    reporting: ["hazard"]
+    # The guarantee the coordinator relies on the surveyor to provide. L2
+    # verifies hazard <= 0.1  =>  hazard <= 0.2 (it holds).
+    refinement:
+      assume: ["hazard <= 0.1"]

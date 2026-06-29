@@ -235,9 +235,28 @@ delegation:
       may_not: ["change_target"]
     reporting: ["tracking_error", "position"]   # expected exposure from child
     escalation_conditions: ["tracking_error > 0.5"]
+    refinement:                                 # optional; how the child discharges it
+      assume: ["tracking_error <= corridor_width"]
 ```
 
 The union of all `to` references across the system defines `H`.
+
+### 7.1 `refinement.assume` — discharging the commitment
+
+`delegates` names a commitment the parent owns; the child realizes it in its own
+representation space. `refinement.assume` records the guarantees the parent
+*relies on* the delegated subgraph to provide, written in the parent's `R`
+extended with the delegation's `reporting` symbols (the same environment as
+`escalation_conditions`; see `cel-environment.md` §6). The intended reading is a
+proof obligation:
+
+```text
+(conjunction of assume)  ⟹  delegates
+```
+
+i.e. if the child delivers the assumed guarantees, the parent's commitment holds.
+L2 discharges this obligation where it can (§10). `assume` is optional; omit it
+when the refinement is not yet formalized.
 
 ## 8. `X` — Escalation policy
 
@@ -341,13 +360,22 @@ fragment:
   symbols must be exposed by the child back to the parent — i.e. the child has an
   `exposure` entry with `to: <parent>` whose `view` covers them. Without this the
   parent cannot observe the commitment it delegated.
+- **Delegation refinement entailment.** Where a delegation supplies
+  `refinement.assume` (§7.1), the assumed guarantees must entail the parent's
+  `delegates` commitment: `assume ∧ ¬delegates` must be unsatisfiable. Entailment
+  is decided in the same linear fragment as the satisfiability check. To stay
+  sound it runs only when the assumptions are modelled *exactly* (no `||`, `!=`,
+  non-linear, or opaque conjuncts dropped); otherwise the obligation is left
+  unverified rather than producing a false positive. A reported failure is a
+  genuine counterexample — an assignment that satisfies `assume` yet breaks the
+  commitment.
 
-The remaining L2 ambitions (semantic entailment of a parent's `success` from the
-children's exposed commitments across the representation boundary, and
-satisfiability outside the linear fragment) require both an explicit refinement
-mapping between vocabularies and a richer solver, and are not yet implemented.
-For a system that passes L1 but fails L2, see
-[`examples/invalid/over-budget/`](../examples/invalid/over-budget/).
+The remaining L2 ambition — entailment of *boolean* or otherwise non-linear
+commitments, and satisfiability outside the linear fragment — requires a richer
+solver and is not yet implemented. For systems that pass L1 but fail L2, see
+[`examples/invalid/over-budget/`](../examples/invalid/over-budget/) (satisfiability)
+and [`examples/invalid/under-refined/`](../examples/invalid/under-refined/)
+(refinement entailment).
 
 ## 11. File conventions
 

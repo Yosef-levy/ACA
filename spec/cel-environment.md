@@ -140,15 +140,18 @@ but field access (`p.lat`) is not available because no schema is attached. A
 future version may back abstract types with protobuf messages to enable field
 access inside expressions.
 
-## 6. Delegation escalation conditions
+## 6. Delegation escalation conditions and refinement assumptions
 
-`delegation[].escalation_conditions` are a special case: they watch the
-*child's* reported telemetry, not the parent's own state. They are therefore
-type-checked against the parent's `R` **extended with the delegation's
-`reporting` symbols**. Those reporting symbols are treated as opaque (`DYN`)
-here because their concrete types live in the child's `R`, which the parent does
-not own. All other `expr`/`when`/`precondition` fields use the unextended `R`
-environment of §2.
+`delegation[].escalation_conditions` and `delegation[].refinement.assume` are a
+special case: they describe the *child's* reported behaviour, not the parent's
+own state. They are therefore type-checked against the parent's `R` **extended
+with the delegation's `reporting` symbols**. Reporting symbols not otherwise
+declared in the parent's `R` are treated as opaque (`DYN`), because their
+concrete types live in the child's `R`, which the parent does not own. (A
+reporting symbol that *is* also a declared parent term keeps that term's type,
+which is what lets L2 reason numerically about a `refinement.assume` over it.)
+All other `expr`/`when`/`precondition` fields use the unextended `R` environment
+of §2.
 
 ## 7. Reference runtime
 

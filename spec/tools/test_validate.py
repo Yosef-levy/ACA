@@ -58,6 +58,26 @@ class OverBudgetTests(unittest.TestCase):
         self.assertEqual(run("--level", "L2", self.SYSTEM), 1)
 
 
+class DelegationRefinementTests(unittest.TestCase):
+    SYSTEM = os.path.join(EXAMPLES, "delegation-refinement", "system.aca.yaml")
+
+    def test_passes_l1(self):
+        self.assertEqual(run("--level", "L1", self.SYSTEM), 0)
+
+    def test_passes_l2(self):
+        self.assertEqual(run("--level", "L2", self.SYSTEM), 0)
+
+
+class UnderRefinedTests(unittest.TestCase):
+    SYSTEM = os.path.join(EXAMPLES, "invalid", "under-refined", "system.aca.yaml")
+
+    def test_passes_l1(self):
+        self.assertEqual(run("--level", "L1", self.SYSTEM), 0)
+
+    def test_fails_l2(self):
+        self.assertEqual(run("--level", "L2", self.SYSTEM), 1)
+
+
 class CliTests(unittest.TestCase):
     def test_unknown_level_rejected(self):
         self.assertEqual(run("--level", "L9", "anything.yaml"), 2)

@@ -1,0 +1,29 @@
+aca_version: "0.1"
+kind: "Charter"
+object:
+  id: "surveyor"
+  role: "Surveyor"
+
+# R - Representation space
+representation:
+  terms:
+    - { name: "hazard", type: "real", range: [0, 1] }
+  success:
+    # The surveyor's local commitment is tighter than what it was asked for.
+    - { name: "safe", expr: "hazard <= 0.1" }
+
+# C - Constraint space
+constraints:
+  - id: "hazard_cap"
+    expr: "hazard <= 0.1"
+    scope: "local"
+    owner: "surveyor"
+    severity: "hard"
+
+# E - Exposure functions
+# The surveyor reports `hazard` back to the coordinator, satisfying the
+# delegation's `reporting` requirement (L2c).
+exposure:
+  - to: "coordinator"
+    view: ["hazard"]
+    trigger: "on_change"

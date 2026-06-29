@@ -167,6 +167,10 @@ def check_expressions(charter, errors):
             label = f"delegation '{f['delegates']}' escalation_condition[{k}]"
             for msg in celcheck.check_expr(cond, env2):
                 errors.append(f"{cid}: {label}: {msg}")
+        for k, cond in enumerate((f.get("refinement") or {}).get("assume", [])):
+            label = f"delegation '{f['delegates']}' refinement.assume[{k}]"
+            for msg in celcheck.check_expr(cond, env2):
+                errors.append(f"{cid}: {label}: {msg}")
 
 
 def check_definition_cycles(charter, errors):

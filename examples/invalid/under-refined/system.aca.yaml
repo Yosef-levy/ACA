@@ -1,0 +1,17 @@
+aca_version: "0.1"
+kind: "System"
+id: "under-refined"
+description: >
+  A deliberately-broken system used to demonstrate L2 delegation-refinement
+  validation. Every charter passes L0 and L1. The coordinator commits to
+  hazard <= 0.2 and delegates it, but the guarantee it records assuming from the
+  surveyor (hazard <= 0.3) is too weak: hazard <= 0.3 does NOT entail
+  hazard <= 0.2 (e.g. hazard = 0.25 satisfies the assumption yet breaks the
+  commitment). The delegation is therefore under-refined.
+
+  Run:
+    python3 spec/tools/validate.py --level L1 examples/invalid/under-refined/system.aca.yaml   # OK
+    python3 spec/tools/validate.py --level L2 examples/invalid/under-refined/system.aca.yaml   # FAIL
+objects:
+  - charter: "./coordinator.aca.yaml"
+  - charter: "./surveyor.aca.yaml"

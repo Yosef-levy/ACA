@@ -87,12 +87,13 @@ class AtomExtractionTests(unittest.TestCase):
         self.assertEqual(self._extract("z <= 10.0"), [])
 
 
-def _charter(cid, terms=None, constraints=None, delegation=None, exposure=None):
+def _charter(cid, terms=None, constraints=None, delegation=None, exposure=None,
+             success=None):
     return {
         "aca_version": "0.1",
         "kind": "Charter",
         "object": {"id": cid, "role": cid},
-        "representation": {"terms": terms or []},
+        "representation": {"terms": terms or [], "success": success or []},
         "constraints": constraints or [],
         "delegation": delegation or [],
         "exposure": exposure or [],
@@ -257,6 +258,74 @@ class DelegationReportingTests(unittest.TestCase):
         child = _charter("child")
         errors = []
         l2check.check_delegation_reporting([parent, child], errors)
+        self.assertEqual(errors, [])
+
+
+class NegateTests(unittest.TestCase):
+    def test_negate_non_strict_becomes_strict(self):
+        # x - 5 <= 0  negated  ->  -(x - 5) < 0
+        n = l2check.negate(ineq({"x": 1}, -5, strict=False))
+        self.assertEqual(n.coeffs["x"], Fraction(-1))
+        self.assertEqual(n.const, Fraction(5))
+        self.assertTrue(n.strict)
+
+    def test_double_negation_is_identity(self):
+        i = ineq({"x": 2}, -3, strict=True)
+        nn = l2check.negate(l2check.negate(i))
+        self.assertEqual(nn.coeffs["x"], i.coeffs["x"])
+        self.assertEqual(nn.const, i.const)
+        self.assertEqual(nn.strict, i.strict)
+
+
+def _delegating_parent(assume, delegates="hazard_ok", commitment="hazard <= 0.2"):
+    return _charter(
+        "parent",
+        terms=[{"name": "hazard", "type": "real", "range": [0, 1]}],
+        success=[{"name": delegates, "expr": commitment}],
+        delegation=[{
+            "delegates": delegates, "to": ["child"], "objective": "x",
+            "reporting": ["hazard"], "refinement": {"assume": assume},
+        }],
+    )
+
+
+class DelegationEntailmentTests(unittest.TestCase):
+    def test_assumption_entails_commitment(self):
+        parent = _delegating_parent(["hazard <= 0.1"])
+        errors = []
+        l2check.check_delegation_entailment([parent], errors)
+        self.assertEqual(errors, [])
+
+    def test_assumption_too_weak_fails(self):
+        parent = _delegating_parent(["hazard <= 0.3"])
+        errors = []
+        l2check.check_delegation_entailment([parent], errors)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("under-refined", errors[0])
+
+    def test_no_refinement_is_skipped(self):
+        parent = _charter(
+            "parent",
+            terms=[{"name": "hazard", "type": "real"}],
+            success=[{"name": "hazard_ok", "expr": "hazard <= 0.2"}],
+            delegation=[{"delegates": "hazard_ok", "to": ["child"], "objective": "x"}],
+        )
+        errors = []
+        l2check.check_delegation_entailment([parent], errors)
+        self.assertEqual(errors, [])
+
+    def test_unmodellable_assumption_is_not_flagged(self):
+        # A disjunction in the assumption cannot be modelled exactly, so the
+        # check must skip rather than risk a false positive.
+        parent = _delegating_parent(["hazard <= 0.3 || hazard <= 0.05"])
+        errors = []
+        l2check.check_delegation_entailment([parent], errors)
+        self.assertEqual(errors, [])
+
+    def test_conjunctive_assumption_entails(self):
+        parent = _delegating_parent(["hazard <= 0.15 && hazard >= 0.0"])
+        errors = []
+        l2check.check_delegation_entailment([parent], errors)
         self.assertEqual(errors, [])
 
 

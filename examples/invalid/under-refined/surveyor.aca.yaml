@@ -1,0 +1,26 @@
+aca_version: "0.1"
+kind: "Charter"
+object:
+  id: "surveyor"
+  role: "Surveyor"
+
+# R - Representation space
+representation:
+  terms:
+    - { name: "hazard", type: "real", range: [0, 1] }
+  success:
+    - { name: "safe", expr: "hazard <= 0.3" }
+
+# C - Constraint space
+constraints:
+  - id: "hazard_cap"
+    expr: "hazard <= 0.3"
+    scope: "local"
+    owner: "surveyor"
+    severity: "hard"
+
+# E - Exposure functions
+exposure:
+  - to: "coordinator"
+    view: ["hazard"]
+    trigger: "on_change"

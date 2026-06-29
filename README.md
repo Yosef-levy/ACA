@@ -60,9 +60,11 @@ charters, never declared independently.**
     │   ├── motion-controller.aca.yaml
     │   ├── energy-manager.aca.yaml
     │   └── human-supervisor.aca.yaml
+    ├── delegation-refinement/              # L2 refinement entailment (valid)
     └── invalid/
         ├── broken-sensor.aca.yaml          # Passes L0, fails L1 (demo)
-        └── over-budget/                    # Passes L1, fails L2 (demo)
+        ├── over-budget/                    # Passes L1, fails L2: unsatisfiable
+        └── under-refined/                  # Passes L1, fails L2: under-refined delegation
 ```
 
 ## Quick start
@@ -105,8 +107,8 @@ errors), enum and state literals are validated, predicate/success definitions ar
 acyclic, and `governed_by`/`realizes_decision` resolve within the charter. L2:
 each object's `hard` constraints (with `range` bounds) are jointly satisfiable,
 every `inherited` constraint traces to a real delegation edge from its `owner`,
-and every `delegation.reporting` symbol is exposed by the child back to the
-parent.
+every `delegation.reporting` symbol is exposed by the child back to the parent,
+and any `delegation.refinement.assume` entails the parent's delegated commitment.
 
 ```bash
 pip install pyyaml jsonschema
@@ -130,8 +132,13 @@ The L1 type-checker is a small, dependency-free CEL subset checker in
 conservative satisfiability prototype (Fourier–Motzkin over a linear fragment).
 For a deliberately broken charter that passes L0 but fails L1, see
 [`examples/invalid/broken-sensor.aca.yaml`](./examples/invalid/broken-sensor.aca.yaml);
-for a system that passes L1 but fails L2, see
-[`examples/invalid/over-budget/`](./examples/invalid/over-budget/).
+for systems that pass L1 but fail L2, see
+[`examples/invalid/over-budget/`](./examples/invalid/over-budget/) (unsatisfiable
+hard constraints) and
+[`examples/invalid/under-refined/`](./examples/invalid/under-refined/) (a
+delegation whose assumed guarantees don't entail the commitment). The valid
+counterpart [`examples/delegation-refinement/`](./examples/delegation-refinement/)
+shows a refinement that does entail its commitment.
 
 ## Testing
 
@@ -148,7 +155,7 @@ python3 -m unittest discover -s spec/tools    # or: python3 -m pytest spec/tools
 |-------|--------|---------|
 | **L0** Structural | Schema validity, symbol declaration, id resolution | `validate.py` (included) |
 | **L1** Local validity | Every expression compiles and type-checks against the `R` CEL environment | `validate.py` (included; `celcheck.py`) |
-| **L2** Compositional validity | Each object's hard constraints are jointly satisfiable; inherited constraints trace to a delegation edge; delegated reporting is exposed back to the parent | `validate.py --level L2` (included; `l2check.py`, conservative linear-arithmetic prototype) |
+| **L2** Compositional validity | Hard constraints jointly satisfiable; inherited constraints trace to a delegation edge; delegated reporting is exposed back to the parent; refinement assumptions entail the delegated commitment | `validate.py --level L2` (included; `l2check.py`, conservative linear-arithmetic prototype) |
 
 ## Relation to A2A
 

@@ -1,0 +1,22 @@
+aca_version: "0.1"
+kind: "Charter"
+object:
+  id: "coordinator"
+  role: "Survey Coordinator"
+
+# R - Representation space
+representation:
+  terms:
+    - { name: "hazard", type: "real", range: [0, 1] }
+  success:
+    - { name: "hazard_ok", expr: "hazard <= 0.2" }
+
+# F - Refinement / delegation relation
+delegation:
+  - delegates: "hazard_ok"
+    to: ["surveyor"]
+    objective: "keep the surveyed corridor below the hazard ceiling"
+    reporting: ["hazard"]
+    # Too weak: hazard <= 0.3 does not entail hazard <= 0.2.
+    refinement:
+      assume: ["hazard <= 0.3"]

@@ -1,0 +1,16 @@
+aca_version: "0.1"
+kind: "System"
+id: "survey-refinement"
+description: >
+  A minimal two-object system that exercises L2 delegation *refinement*. The
+  coordinator delegates a hazard-bound commitment to a surveyor and records, in
+  `delegation.refinement.assume`, the guarantee it relies on the surveyor to
+  provide (hazard <= 0.1). L2 checks that this assumption entails the
+  coordinator's own commitment (hazard <= 0.2) -- it does, so the system is
+  compositionally valid.
+
+  Run:
+    python3 spec/tools/validate.py --level L2 examples/delegation-refinement/system.aca.yaml
+objects:
+  - charter: "./coordinator.aca.yaml"
+  - charter: "./surveyor.aca.yaml"
