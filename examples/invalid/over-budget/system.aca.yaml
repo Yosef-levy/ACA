@@ -1,0 +1,18 @@
+aca_version: "0.1"
+kind: "System"
+id: "over-budget"
+description: >
+  A deliberately-broken system used to demonstrate L2 (compositional)
+  validation. Every charter passes L0 and L1: each is structurally valid and
+  every expression type-checks against its own R. The system is nonetheless
+  infeasible -- the consumer is handed two HARD constraints over the shared
+  `reserve` term that cannot both hold (reserve >= 200 and reserve <= 100).
+  L1 cannot see this because neither charter is locally wrong; only the
+  composition is.
+
+  Run:
+    python3 spec/tools/validate.py --level L1 examples/invalid/over-budget/system.aca.yaml   # OK
+    python3 spec/tools/validate.py --level L2 examples/invalid/over-budget/system.aca.yaml   # FAIL
+objects:
+  - charter: "./budgeter.aca.yaml"
+  - charter: "./consumer.aca.yaml"

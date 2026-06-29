@@ -1,0 +1,28 @@
+aca_version: "0.1"
+kind: "Charter"
+object:
+  id: "budgeter"
+  role: "Energy Budgeter"
+
+# R - Representation space
+representation:
+  terms:
+    - { name: "reserve", type: "real", unit: "Wh" }
+  success:
+    - { name: "within_cap", expr: "reserve <= 100.0" }
+
+# C - Constraint space
+# Owns a shared cap on the reserve and lends it to the consumer.
+constraints:
+  - id: "reserve_cap"
+    expr: "reserve <= 100.0"
+    scope: "shared"
+    owner: "budgeter"
+    shared_with: ["consumer"]
+    severity: "hard"
+
+# E - Exposure functions
+exposure:
+  - to: "consumer"
+    view: ["reserve"]
+    trigger: "on_request"

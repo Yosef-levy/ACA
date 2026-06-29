@@ -48,8 +48,10 @@ charters, never declared independently.**
 │   │   ├── charter.schema.json             # JSON Schema for a single charter
 │   │   └── system.schema.json              # JSON Schema for a system manifest
 │   └── tools/
-│       ├── validate.py                     # L0 + L1 reference validator
-│       └── celcheck.py                     # CEL subset type-checker (L1)
+│       ├── validate.py                     # L0 + L1 + L2 reference validator
+│       ├── celcheck.py                     # CEL subset type-checker (L1)
+│       ├── l2check.py                      # compositional satisfiability + provenance (L2)
+│       └── test_*.py                       # unittest suite for the tools
 └── examples/
     ├── drone-mission/                      # A complete worked example
     │   ├── system.aca.yaml                 # System manifest (membership only)
@@ -59,7 +61,8 @@ charters, never declared independently.**
     │   ├── energy-manager.aca.yaml
     │   └── human-supervisor.aca.yaml
     └── invalid/
-        └── broken-sensor.aca.yaml          # Passes L0, fails L1 (demo)
+        ├── broken-sensor.aca.yaml          # Passes L0, fails L1 (demo)
+        └── over-budget/                    # Passes L1, fails L2 (demo)
 ```
 
 ## Quick start
@@ -92,20 +95,26 @@ abstraction validity checkable.
 
 ## Validating
 
-The reference validator performs **L0 structural** and **L1 local-validity**
-checks. L0: JSON Schema conformance, referential integrity (every symbol used is
-declared in `R`), object-id resolution across the system, and
-escalation-projection consistency. L1: every `expr`/`when`/`precondition` parses
-and type-checks against the CEL environment built from `R` (catching symbols used
-inside expressions but not declared in `R`, plus confident type errors), enum and
-state literals are validated, predicate/success definitions are acyclic, and
-`governed_by`/`realizes_decision` resolve within the charter.
+The reference validator performs **L0 structural**, **L1 local-validity**, and
+**L2 compositional** checks. L0: JSON Schema conformance, referential integrity
+(every symbol used is declared in `R`), object-id resolution across the system,
+and escalation-projection consistency. L1: every `expr`/`when`/`precondition`
+parses and type-checks against the CEL environment built from `R` (catching
+symbols used inside expressions but not declared in `R`, plus confident type
+errors), enum and state literals are validated, predicate/success definitions are
+acyclic, and `governed_by`/`realizes_decision` resolve within the charter. L2:
+each object's `hard` constraints (with `range` bounds) are jointly satisfiable,
+and every `inherited` constraint traces to a real delegation edge from its
+`owner`.
 
 ```bash
 pip install pyyaml jsonschema
 
 # Validate a whole system at L1 (default; loads every member charter):
 python3 spec/tools/validate.py examples/drone-mission/system.aca.yaml
+
+# Add compositional (L2) checks:
+python3 spec/tools/validate.py --level L2 examples/drone-mission/system.aca.yaml
 
 # Or validate charters directly:
 python3 spec/tools/validate.py examples/drone-mission/*.aca.yaml
@@ -115,9 +124,22 @@ python3 spec/tools/validate.py --level L0 examples/drone-mission/system.aca.yaml
 ```
 
 The L1 type-checker is a small, dependency-free CEL subset checker in
-[`spec/tools/celcheck.py`](./spec/tools/celcheck.py). For a deliberately broken
-charter that passes L0 but fails L1, see
-[`examples/invalid/broken-sensor.aca.yaml`](./examples/invalid/broken-sensor.aca.yaml).
+[`spec/tools/celcheck.py`](./spec/tools/celcheck.py); the L2 checker in
+[`spec/tools/l2check.py`](./spec/tools/l2check.py) is an equally dependency-free,
+conservative satisfiability prototype (Fourier–Motzkin over a linear fragment).
+For a deliberately broken charter that passes L0 but fails L1, see
+[`examples/invalid/broken-sensor.aca.yaml`](./examples/invalid/broken-sensor.aca.yaml);
+for a system that passes L1 but fails L2, see
+[`examples/invalid/over-budget/`](./examples/invalid/over-budget/).
+
+## Testing
+
+The tools ship with a `unittest` suite (no extra dependencies beyond the
+validator's own):
+
+```bash
+python3 -m unittest discover -s spec/tools    # or: python3 -m pytest spec/tools
+```
 
 ## Conformance levels
 
@@ -125,7 +147,7 @@ charter that passes L0 but fails L1, see
 |-------|--------|---------|
 | **L0** Structural | Schema validity, symbol declaration, id resolution | `validate.py` (included) |
 | **L1** Local validity | Every expression compiles and type-checks against the `R` CEL environment | `validate.py` (included; `celcheck.py`) |
-| **L2** Compositional validity | Shared/inherited hard constraints are jointly satisfiable; delegated commitments are entailed by children | Requires an SMT backend; optional in v0.1 |
+| **L2** Compositional validity | Each object's hard constraints are jointly satisfiable; inherited constraints trace to a delegation edge | `validate.py --level L2` (included; `l2check.py`, conservative linear-arithmetic prototype) |
 
 ## Relation to A2A
 

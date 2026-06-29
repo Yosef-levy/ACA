@@ -1,0 +1,29 @@
+aca_version: "0.1"
+kind: "Charter"
+object:
+  id: "consumer"
+  role: "Reserve Consumer"
+
+# R - Representation space
+representation:
+  terms:
+    - { name: "reserve", type: "real", unit: "Wh" }
+  success:
+    - { name: "demand_met", expr: "reserve >= 200.0" }
+
+# C - Constraint space
+# A local hard demand that needs at least 200 Wh, plus the shared cap inherited
+# from the budgeter that allows at most 100 Wh. Each is locally fine; together
+# they are unsatisfiable.
+constraints:
+  - id: "demand_floor"
+    expr: "reserve >= 200.0"
+    scope: "local"
+    owner: "consumer"
+    severity: "hard"
+  - id: "reserve_cap"
+    expr: "reserve <= 100.0"
+    scope: "shared"
+    owner: "budgeter"
+    shared_with: ["consumer"]
+    severity: "hard"

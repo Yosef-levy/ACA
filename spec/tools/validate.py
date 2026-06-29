@@ -21,13 +21,21 @@ L1 — Local validity (from aca-spec.md):
      constraint declared in the same charter; `actions[].realizes_decision`
      resolves to a decision in the same charter.
 
-L2 (compositional satisfiability) requires an SMT backend and is out of scope
-for this reference tool; see aca-spec.md §10.
+L2 — Compositional validity (prototype; see l2check.py and aca-spec.md §10):
+
+  1. For each object, the conjunction of its `hard` constraints (any scope) plus
+     its terms' `range` bounds is satisfiable over the modelled linear fragment.
+  2. Every `inherited` constraint traces to a delegation edge from its `owner`.
+
+L2 is a conservative prototype over a decidable linear fragment, not a full SMT
+backend; it reports a contradiction only when it can prove one. See aca-spec.md
+§10 for the full L2 ambition.
 
 Usage:
-    python3 validate.py path/to/system.aca.yaml
+    python3 validate.py path/to/system.aca.yaml                # default: L1
+    python3 validate.py --level L2 path/to/system.aca.yaml     # + compositional
     python3 validate.py path/to/charter.aca.yaml [more.aca.yaml ...]
-    python3 validate.py --level L0 path/to/system.aca.yaml   # structural only
+    python3 validate.py --level L0 path/to/system.aca.yaml     # structural only
 
 Requires: pyyaml, jsonschema
 """
@@ -41,6 +49,7 @@ import yaml
 from jsonschema import Draft202012Validator
 
 import celcheck
+import l2check
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCHEMA_DIR = os.path.join(HERE, "..", "schema")
@@ -258,10 +267,15 @@ def validate_charters(charters, errors, level="L1"):
                 errors.append(f"{cid}: references unknown object id '{ref}'")
         # L1 checks operate on expressions; skip if the document is structurally
         # broken, since the schema errors above are the actionable ones.
-        if level == "L1" and not schema_issues:
+        if level in ("L1", "L2") and not schema_issues:
             check_expressions(c, errors)
             check_definition_cycles(c, errors)
             check_local_references(c, errors)
+
+    # L2 is compositional: it reasons over the whole set of charters at once,
+    # and only when each is at least structurally sound.
+    if level == "L2" and not errors:
+        l2check.check_system(charters, errors)
 
 
 def main(argv):
@@ -273,14 +287,14 @@ def main(argv):
         arg = args[i]
         if arg == "--level":
             i += 1
-            if i >= len(args) or args[i] not in ("L0", "L1"):
-                print("error: --level requires L0 or L1")
+            if i >= len(args) or args[i] not in ("L0", "L1", "L2"):
+                print("error: --level requires L0, L1, or L2")
                 return 2
             level = args[i]
         elif arg.startswith("--level="):
             level = arg.split("=", 1)[1]
-            if level not in ("L0", "L1"):
-                print("error: --level requires L0 or L1")
+            if level not in ("L0", "L1", "L2"):
+                print("error: --level requires L0, L1, or L2")
                 return 2
         else:
             paths.append(arg)

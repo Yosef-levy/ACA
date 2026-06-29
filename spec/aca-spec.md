@@ -307,6 +307,9 @@ and are deferred to L2 tooling:
   `governed_by` constraints (satisfiability).
 
 ### L2 — Compositional validity
+
+The full L2 ambition is:
+
 - The conjunction of all `hard` `inherited` + `shared` constraints over shared
   terms is satisfiable (no two hard constraints mutually contradict).
 - For each delegated commitment in `F`, the union of children's exposed
@@ -314,9 +317,31 @@ and are deferred to L2 tooling:
 - Every `inherited` constraint traces to a real delegation edge from its
   declared `owner`.
 
-CEL evaluates; it does not solve. L2 satisfiability requires either an SMT
-backend or restriction to a decidable fragment, and is therefore optional in
-v0.1.
+CEL evaluates; it does not solve. General L2 satisfiability requires either an
+SMT backend or restriction to a decidable fragment.
+
+The reference validator (`spec/tools/validate.py --level L2`, backed by
+`spec/tools/l2check.py`) implements a **conservative prototype** over a decidable
+fragment:
+
+- **Hard-constraint satisfiability.** For each object, the conjunction of every
+  `severity: hard` constraint that governs it (any scope) plus its terms' numeric
+  `range` bounds must be satisfiable. Satisfiability is decided by
+  Fourier–Motzkin elimination over the rationals — complete for linear real
+  arithmetic. Integer terms are relaxed to reals (sound for UNSAT). Everything
+  outside the linear fragment (`||`, `!=`, non-linear terms, durations/
+  timestamps, opaque abstract types) is **dropped** from the modelled system.
+  Dropping conjuncts only weakens the system, so a reported "unsatisfiable" is
+  sound for the full system; the cost is that some real contradictions are left
+  unflagged rather than producing false positives (the same conservative stance
+  as the L1 checker).
+- **Inherited-constraint provenance.** Every `scope: inherited` constraint names
+  an `owner`; that owner must declare a delegation edge (`F`) to this object.
+
+The remaining L2 ambitions (delegation entailment of parent `success`, and
+satisfiability outside the linear fragment) require a richer solver and are not
+yet implemented. For a system that passes L1 but fails L2, see
+[`examples/invalid/over-budget/`](../examples/invalid/over-budget/).
 
 ## 11. File conventions
 
