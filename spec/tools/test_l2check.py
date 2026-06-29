@@ -87,7 +87,7 @@ class AtomExtractionTests(unittest.TestCase):
         self.assertEqual(self._extract("z <= 10.0"), [])
 
 
-def _charter(cid, terms=None, constraints=None, delegation=None):
+def _charter(cid, terms=None, constraints=None, delegation=None, exposure=None):
     return {
         "aca_version": "0.1",
         "kind": "Charter",
@@ -95,6 +95,7 @@ def _charter(cid, terms=None, constraints=None, delegation=None):
         "representation": {"terms": terms or []},
         "constraints": constraints or [],
         "delegation": delegation or [],
+        "exposure": exposure or [],
     }
 
 
@@ -202,6 +203,61 @@ class InheritedProvenanceTests(unittest.TestCase):
         l2check.check_inherited_provenance([child], errors)
         self.assertEqual(len(errors), 1)
         self.assertIn("owned by the object itself", errors[0])
+
+
+class DelegationReportingTests(unittest.TestCase):
+    def test_child_exposes_all_reported_symbols(self):
+        parent = _charter(
+            "parent",
+            delegation=[{"delegates": "g", "to": ["child"], "objective": "x",
+                         "reporting": ["a", "b"]}],
+        )
+        child = _charter(
+            "child",
+            exposure=[{"to": "parent", "view": ["a", "b"], "trigger": "on_change"}],
+        )
+        errors = []
+        l2check.check_delegation_reporting([parent, child], errors)
+        self.assertEqual(errors, [])
+
+    def test_missing_reported_symbol_fails(self):
+        parent = _charter(
+            "parent",
+            delegation=[{"delegates": "g", "to": ["child"], "objective": "x",
+                         "reporting": ["a", "b"]}],
+        )
+        child = _charter(
+            "child",
+            exposure=[{"to": "parent", "view": ["a"], "trigger": "on_change"}],
+        )
+        errors = []
+        l2check.check_delegation_reporting([parent, child], errors)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("'b'", errors[0])
+
+    def test_exposure_to_other_target_does_not_count(self):
+        parent = _charter(
+            "parent",
+            delegation=[{"delegates": "g", "to": ["child"], "objective": "x",
+                         "reporting": ["a"]}],
+        )
+        child = _charter(
+            "child",
+            exposure=[{"to": "someone-else", "view": ["a"], "trigger": "on_change"}],
+        )
+        errors = []
+        l2check.check_delegation_reporting([parent, child], errors)
+        self.assertEqual(len(errors), 1)
+
+    def test_no_reporting_clause_is_ok(self):
+        parent = _charter(
+            "parent",
+            delegation=[{"delegates": "g", "to": ["child"], "objective": "x"}],
+        )
+        child = _charter("child")
+        errors = []
+        l2check.check_delegation_reporting([parent, child], errors)
+        self.assertEqual(errors, [])
 
 
 if __name__ == "__main__":

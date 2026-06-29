@@ -26,6 +26,8 @@ L2 — Compositional validity (prototype; see l2check.py and aca-spec.md §10):
   1. For each object, the conjunction of its `hard` constraints (any scope) plus
      its terms' `range` bounds is satisfiable over the modelled linear fragment.
   2. Every `inherited` constraint traces to a delegation edge from its `owner`.
+  3. Every `delegation.reporting` symbol is exposed by the child back to the
+     parent (an `exposure` to the parent whose `view` covers it).
 
 L2 is a conservative prototype over a decidable linear fragment, not a full SMT
 backend; it reports a contradiction only when it can prove one. See aca-spec.md

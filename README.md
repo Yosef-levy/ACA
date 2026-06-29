@@ -104,8 +104,9 @@ symbols used inside expressions but not declared in `R`, plus confident type
 errors), enum and state literals are validated, predicate/success definitions are
 acyclic, and `governed_by`/`realizes_decision` resolve within the charter. L2:
 each object's `hard` constraints (with `range` bounds) are jointly satisfiable,
-and every `inherited` constraint traces to a real delegation edge from its
-`owner`.
+every `inherited` constraint traces to a real delegation edge from its `owner`,
+and every `delegation.reporting` symbol is exposed by the child back to the
+parent.
 
 ```bash
 pip install pyyaml jsonschema
@@ -147,7 +148,7 @@ python3 -m unittest discover -s spec/tools    # or: python3 -m pytest spec/tools
 |-------|--------|---------|
 | **L0** Structural | Schema validity, symbol declaration, id resolution | `validate.py` (included) |
 | **L1** Local validity | Every expression compiles and type-checks against the `R` CEL environment | `validate.py` (included; `celcheck.py`) |
-| **L2** Compositional validity | Each object's hard constraints are jointly satisfiable; inherited constraints trace to a delegation edge | `validate.py --level L2` (included; `l2check.py`, conservative linear-arithmetic prototype) |
+| **L2** Compositional validity | Each object's hard constraints are jointly satisfiable; inherited constraints trace to a delegation edge; delegated reporting is exposed back to the parent | `validate.py --level L2` (included; `l2check.py`, conservative linear-arithmetic prototype) |
 
 ## Relation to A2A
 

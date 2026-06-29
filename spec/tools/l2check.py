@@ -16,6 +16,12 @@ L2b — **Inherited-constraint provenance.** Every ``scope: inherited`` constrai
   delegation edge (``F``). An inherited commitment with no delegation behind it
   is a dangling obligation.
 
+L2c — **Delegation reporting coverage.** Each ``delegation`` entry lists the
+  ``reporting`` symbols the parent expects from the child. The child must expose
+  those symbols back to the parent (an ``exposure`` entry with ``to: <parent>``
+  whose ``view`` covers them); otherwise the parent cannot observe the
+  commitment it delegated.
+
 Like ``celcheck`` for L1, this checker is **conservative**: it reports a failure
 only when it can *prove* one inside a decidable fragment (conjunctions of linear
 inequalities over the reals). Everything it cannot model -- disjunctions (``||``),
@@ -357,8 +363,42 @@ def check_inherited_provenance(charters, errors):
                 )
 
 
+def check_delegation_reporting(charters, errors):
+    """L2c: a child must expose, back to its parent, what the parent delegates.
+
+    Each ``delegation`` entry lists ``reporting`` symbols the parent expects the
+    child to surface (in the child's vocabulary). For the delegation edge to be
+    well-formed, the child must have an ``exposure`` entry targeting the parent
+    whose ``view`` covers every reporting symbol; otherwise the parent has no way
+    to observe the commitment it delegated.
+    """
+    by_id = {c["object"]["id"]: c for c in charters}
+    for parent in charters:
+        pid = parent["object"]["id"]
+        for f in parent.get("delegation", []):
+            reporting = set(f.get("reporting", []))
+            if not reporting:
+                continue
+            for child_id in f.get("to", []):
+                child = by_id.get(child_id)
+                if child is None:
+                    continue  # L0 reports unknown object ids
+                exposed = set()
+                for e in child.get("exposure", []):
+                    if e.get("to") == pid:
+                        exposed.update(e.get("view", []))
+                missing = reporting - exposed
+                if missing:
+                    errors.append(
+                        f"{pid}: delegation of '{f['delegates']}' to '{child_id}' "
+                        f"expects reporting {sorted(reporting)}, but '{child_id}' "
+                        f"does not expose {sorted(missing)} to '{pid}'"
+                    )
+
+
 def check_system(charters, errors):
     """Run all L2 checks over a fully-loaded set of charters."""
     for c in charters:
         check_satisfiability(c, errors)
     check_inherited_provenance(charters, errors)
+    check_delegation_reporting(charters, errors)

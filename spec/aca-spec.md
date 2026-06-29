@@ -337,10 +337,16 @@ fragment:
   as the L1 checker).
 - **Inherited-constraint provenance.** Every `scope: inherited` constraint names
   an `owner`; that owner must declare a delegation edge (`F`) to this object.
+- **Delegation reporting coverage.** Each `delegation` entry's `reporting`
+  symbols must be exposed by the child back to the parent — i.e. the child has an
+  `exposure` entry with `to: <parent>` whose `view` covers them. Without this the
+  parent cannot observe the commitment it delegated.
 
-The remaining L2 ambitions (delegation entailment of parent `success`, and
-satisfiability outside the linear fragment) require a richer solver and are not
-yet implemented. For a system that passes L1 but fails L2, see
+The remaining L2 ambitions (semantic entailment of a parent's `success` from the
+children's exposed commitments across the representation boundary, and
+satisfiability outside the linear fragment) require both an explicit refinement
+mapping between vocabularies and a richer solver, and are not yet implemented.
+For a system that passes L1 but fails L2, see
 [`examples/invalid/over-budget/`](../examples/invalid/over-budget/).
 
 ## 11. File conventions
