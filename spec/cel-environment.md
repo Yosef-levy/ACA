@@ -140,9 +140,26 @@ but field access (`p.lat`) is not available because no schema is attached. A
 future version may back abstract types with protobuf messages to enable field
 access inside expressions.
 
-## 6. Reference runtime
+## 6. Delegation escalation conditions
+
+`delegation[].escalation_conditions` are a special case: they watch the
+*child's* reported telemetry, not the parent's own state. They are therefore
+type-checked against the parent's `R` **extended with the delegation's
+`reporting` symbols**. Those reporting symbols are treated as opaque (`DYN`)
+here because their concrete types live in the child's `R`, which the parent does
+not own. All other `expr`/`when`/`precondition` fields use the unextended `R`
+environment of §2.
+
+## 7. Reference runtime
 
 The reference validator (`spec/tools/validate.py`) performs L0 structural checks
-only and does not embed a CEL engine. For L1 type checking, bind `R` to a CEL
-runtime of your choice; `cel-go` is the suggested reference implementation
-because of its mature type-checker API.
+and L1 local-validity checks. For L1 it embeds a small, dependency-free CEL
+*subset* type-checker (`spec/tools/celcheck.py`) that builds the environment of
+§2 from `R` and verifies that every expression parses and type-checks. The
+checker is intentionally conservative: it reports an error only when confident
+(undeclared identifier, a boolean operator on a number, a comparison across
+incompatible base types, an invalid enum/state literal), and treats abstract
+(namespaced) types as opaque so opaque values never produce false positives.
+
+For full CEL coverage in production tooling, bind `R` to a complete CEL runtime;
+`cel-go` is the suggested implementation because of its mature type-checker API.

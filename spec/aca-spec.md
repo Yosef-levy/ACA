@@ -289,10 +289,22 @@ A conforming validator checks, in increasing depth:
 
 ### L1 — Local validity
 - Every `expr`, `when`, and `precondition` compiles and type-checks against the
-  `R` CEL environment.
+  `R` CEL environment. (`delegation.escalation_conditions` are checked against
+  `R` extended with that delegation's `reporting` symbols; see
+  `cel-environment.md` §6.)
+- `state == '...'` and enum comparisons reference only declared state/enum values.
+- `predicate`/`success` definitions are acyclic.
+- `decisions[].governed_by` / `actions[].governed_by` resolve to a constraint in
+  the same charter, and `actions[].realizes_decision` resolves to a decision in
+  the same charter.
+- Each `success` condition is expressible from `R`.
+
+The reference validator (`spec/tools/validate.py`, default `--level L1`)
+implements the checks above. The remaining L1 ambitions below require a solver
+and are deferred to L2 tooling:
+
 - Each `decision` has at least one option capable of satisfying its
-  `governed_by` constraints.
-- Each `success` condition is expressible from `R` and reachable given `D`/`A`.
+  `governed_by` constraints (satisfiability).
 
 ### L2 — Compositional validity
 - The conjunction of all `hard` `inherited` + `shared` constraints over shared

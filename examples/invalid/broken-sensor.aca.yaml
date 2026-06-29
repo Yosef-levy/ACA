@@ -1,0 +1,38 @@
+aca_version: "0.1"
+kind: "Charter"
+# A deliberately-broken charter used to demonstrate L1 validation.
+# It is structurally valid (passes L0) but contains local-validity errors.
+# Run:  python3 spec/tools/validate.py examples/invalid/broken-sensor.aca.yaml
+object:
+  id: "broken-sensor"
+  role: "Broken Sensor"
+
+representation:
+  terms:
+    - { name: "reading", type: "real", range: [0, 1] }
+    - { name: "label", type: "enum", values: ["ok", "warn", "fail"] }
+  states:
+    - { name: "idle" }
+    - { name: "active" }
+  predicates:
+    # references `threshold`, which is never declared in R -> L1 error
+    - { name: "high", expr: "reading >= threshold" }
+  success:
+    # boolean operator applied to a number -> L1 type error
+    - { name: "sensor_ok", expr: "reading && high" }
+
+decisions:
+  - id: "emit"
+    options: { type: "bool" }
+    locality: "local"
+    # compares an enum term to a value not in its declared set -> L1 error
+    preconditions: ["label == 'broken'"]
+    # references a constraint that does not exist in this charter -> L1 error
+    governed_by: ["nonexistent_budget"]
+
+escalation:
+  # compares the state machine to an undeclared state -> L1 error
+  - id: "wrong_state"
+    when: "state == 'flying'"
+    to: ["broken-sensor"]
+    action: "stop"
