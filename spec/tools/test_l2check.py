@@ -87,6 +87,35 @@ class AtomExtractionTests(unittest.TestCase):
         self.assertEqual(self._extract("z <= 10.0"), [])
 
 
+class FormulaSatTests(unittest.TestCase):
+    def _f(self, expr, numeric=("x", "y")):
+        return l2check.to_formula(l2check.celcheck.parse(expr), {}, set(numeric))
+
+    def test_linear_conjunction_unsat(self):
+        self.assertIs(l2check.formula_sat(self._f("x >= 2.0 && x <= 1.0")), False)
+
+    def test_disjunction_sat(self):
+        self.assertIs(l2check.formula_sat(self._f("x >= 2.0 || x <= 1.0")), True)
+
+    def test_negation_of_conjunction(self):
+        # !(x <= 1 && x >= 0)  is satisfiable (e.g. x = 5)
+        self.assertIs(l2check.formula_sat(self._f("!(x <= 1.0 && x >= 0.0)")), True)
+
+    def test_opaque_atom_relaxed_to_free_bool(self):
+        # size(x) is opaque; the comparison is treated as a free boolean -> SAT.
+        self.assertIs(l2check.formula_sat(self._f("size(x) <= 0")), True)
+
+    def test_equality_unsat_with_conflicting_bound(self):
+        # x == 0 && x >= 1  is unsatisfiable
+        self.assertIs(l2check.formula_sat(self._f("x == 0.0 && x >= 1.0")), False)
+
+    def test_entailment_holds_and_fails(self):
+        tight = self._f("x <= 0.1")
+        loose = self._f("x <= 0.2")
+        self.assertEqual(l2check.entailment_status(tight, loose, set()), "holds")
+        self.assertEqual(l2check.entailment_status(loose, tight, set()), "fails")
+
+
 def _charter(cid, terms=None, constraints=None, delegation=None, exposure=None,
              success=None):
     return {
@@ -314,16 +343,61 @@ class DelegationEntailmentTests(unittest.TestCase):
         l2check.check_delegation_entailment([parent], errors)
         self.assertEqual(errors, [])
 
-    def test_unmodellable_assumption_is_not_flagged(self):
-        # A disjunction in the assumption cannot be modelled exactly, so the
-        # check must skip rather than risk a false positive.
-        parent = _delegating_parent(["hazard <= 0.3 || hazard <= 0.05"])
+    def test_conjunctive_assumption_entails(self):
+        parent = _delegating_parent(["hazard <= 0.15 && hazard >= 0.0"])
         errors = []
         l2check.check_delegation_entailment([parent], errors)
         self.assertEqual(errors, [])
 
-    def test_conjunctive_assumption_entails(self):
-        parent = _delegating_parent(["hazard <= 0.15 && hazard >= 0.0"])
+    def test_disjunctive_assumption_too_weak_fails(self):
+        # h <= 0.3 || h <= 0.05  is just  h <= 0.3, which does not entail h <= 0.2.
+        parent = _delegating_parent(["hazard <= 0.3 || hazard <= 0.05"])
+        errors = []
+        l2check.check_delegation_entailment([parent], errors)
+        self.assertEqual(len(errors), 1)
+
+    def test_disjunctive_commitment_entailed(self):
+        # h <= 0.1 entails (h <= 0.5 || h >= 2.0) via the first disjunct.
+        parent = _delegating_parent(
+            ["hazard <= 0.1"], commitment="hazard <= 0.5 || hazard >= 2.0")
+        errors = []
+        l2check.check_delegation_entailment([parent], errors)
+        self.assertEqual(errors, [])
+
+    def test_equality_commitment_failure(self):
+        # h <= 0.1 does not pin h == 0.0, so entailment fails (and is exact).
+        parent = _delegating_parent(
+            ["hazard <= 0.1"], commitment="hazard == 0.0")
+        errors = []
+        l2check.check_delegation_entailment([parent], errors)
+        self.assertEqual(len(errors), 1)
+
+    def test_opaque_commitment_not_flagged(self):
+        # Commitment over a bare boolean term is opaque -> cannot be refuted.
+        parent = _charter(
+            "parent",
+            terms=[{"name": "flag", "type": "bool"},
+                   {"name": "hazard", "type": "real"}],
+            success=[{"name": "done", "expr": "flag"}],
+            delegation=[{"delegates": "done", "to": ["child"], "objective": "x",
+                         "reporting": ["hazard"],
+                         "refinement": {"assume": ["hazard <= 0.1"]}}],
+        )
+        errors = []
+        l2check.check_delegation_entailment([parent], errors)
+        self.assertEqual(errors, [])
+
+    def test_integer_domain_not_flagged(self):
+        # Over reals 2n <= 1 does not entail n <= 0 (n = 0.3), but over the
+        # integers it does. The int gate must suppress this false positive.
+        parent = _charter(
+            "parent",
+            terms=[{"name": "n", "type": "int"}],
+            success=[{"name": "bound", "expr": "n <= 0"}],
+            delegation=[{"delegates": "bound", "to": ["child"], "objective": "x",
+                         "reporting": ["n"],
+                         "refinement": {"assume": ["2 * n <= 1"]}}],
+        )
         errors = []
         l2check.check_delegation_entailment([parent], errors)
         self.assertEqual(errors, [])

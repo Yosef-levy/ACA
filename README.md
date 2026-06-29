@@ -129,7 +129,9 @@ python3 spec/tools/validate.py --level L0 examples/drone-mission/system.aca.yaml
 The L1 type-checker is a small, dependency-free CEL subset checker in
 [`spec/tools/celcheck.py`](./spec/tools/celcheck.py); the L2 checker in
 [`spec/tools/l2check.py`](./spec/tools/l2check.py) is an equally dependency-free,
-conservative satisfiability prototype (Fourier–Motzkin over a linear fragment).
+conservative prototype — Fourier–Motzkin for constraint satisfiability and a
+small SAT-modulo-linear-arithmetic procedure for refinement entailment (boolean
+structure over linear atoms).
 For a deliberately broken charter that passes L0 but fails L1, see
 [`examples/invalid/broken-sensor.aca.yaml`](./examples/invalid/broken-sensor.aca.yaml);
 for systems that pass L1 but fail L2, see

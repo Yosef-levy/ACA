@@ -362,17 +362,23 @@ fragment:
   parent cannot observe the commitment it delegated.
 - **Delegation refinement entailment.** Where a delegation supplies
   `refinement.assume` (§7.1), the assumed guarantees must entail the parent's
-  `delegates` commitment: `assume ∧ ¬delegates` must be unsatisfiable. Entailment
-  is decided in the same linear fragment as the satisfiability check. To stay
-  sound it runs only when the assumptions are modelled *exactly* (no `||`, `!=`,
-  non-linear, or opaque conjuncts dropped); otherwise the obligation is left
-  unverified rather than producing a false positive. A reported failure is a
-  genuine counterexample — an assignment that satisfies `assume` yet breaks the
+  `delegates` commitment: `assume ∧ ¬delegates` must be unsatisfiable. Both sides
+  may carry arbitrary boolean structure (`&&`, `||`, `!`, `==`, `!=`) over linear
+  atoms; satisfiability is decided by a small SAT-modulo-linear-arithmetic
+  procedure (boolean enumeration with a Fourier–Motzkin theory check). It is
+  exact when every atom is linear; *opaque* atoms (boolean terms, non-linear
+  comparisons, durations/timestamps, abstract types) are treated as free
+  booleans — a relaxation that keeps the `holds` (UNSAT) direction sound. To
+  avoid false positives, a failure is reported only when the refutation is exact:
+  no opaque atoms and no integer-typed variables are involved (an integer-domain
+  gap can otherwise make a real counterexample spurious). A reported failure is a
+  genuine counterexample — an assignment satisfying `assume` yet breaking the
   commitment.
 
-The remaining L2 ambition — entailment of *boolean* or otherwise non-linear
-commitments, and satisfiability outside the linear fragment — requires a richer
-solver and is not yet implemented. For systems that pass L1 but fail L2, see
+The remaining L2 ambition — entailment for *opaque* commitments (boolean terms
+and non-linear conditions) and exact reasoning over integer domains — requires a
+richer (e.g. SMT) backend, and such obligations are left unverified rather than
+flagged. For systems that pass L1 but fail L2, see
 [`examples/invalid/over-budget/`](../examples/invalid/over-budget/) (satisfiability)
 and [`examples/invalid/under-refined/`](../examples/invalid/under-refined/)
 (refinement entailment).
