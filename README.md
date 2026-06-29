@@ -1,4 +1,4 @@
-# ACA — Agent Charter Abstraction
+# ACA — Autonomy Composition Abstraction
 
 ACA is a generic, machine-readable way to describe **autonomous agents inside
 hierarchical or graph-structured systems**. It pairs a conceptual model with a

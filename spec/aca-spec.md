@@ -1,4 +1,4 @@
-# ACA-Spec v0.1 — Agent Charter Abstraction Specification
+# ACA-Spec v0.1 — Autonomy Composition Abstraction Specification
 
 > Status: Draft (v0.1)
 > Companion theory: [`../hierarchical_autonomy_abstraction.md`](../hierarchical_autonomy_abstraction.md)
