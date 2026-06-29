@@ -1,0 +1,18 @@
+aca_version: "0.1"
+kind: "System"
+id: "drone-mission-7"
+description: >
+  A single-drone inspection mission. Demonstrates a full ACA graph:
+  a hierarchical chain (mission -> nav -> motion), a lateral energy
+  dependency (nav <-> energy), and a human approval/escalation loop.
+# Obj. Membership only.
+# H (hierarchical edges) are DERIVED from each charter's delegation.to:
+#     mission-planner -> nav-planner -> motion-controller
+# K (lateral edges) are DERIVED from constraints[scope=shared].shared_with:
+#     nav-planner <-> energy-manager
+objects:
+  - charter: "./mission-planner.aca.yaml"
+  - charter: "./nav-planner.aca.yaml"
+  - charter: "./motion-controller.aca.yaml"
+  - charter: "./energy-manager.aca.yaml"
+  - charter: "./human-supervisor.aca.yaml"

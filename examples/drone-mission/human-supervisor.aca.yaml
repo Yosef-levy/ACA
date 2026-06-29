@@ -1,0 +1,34 @@
+aca_version: "0.1"
+kind: "Charter"
+object:
+  id: "human-supervisor"
+  role: "Human Supervisor"
+
+# R - Representation space
+# A human is modeled as an autonomy object too: the boundary at which
+# authority for unresolved cases ultimately rests.
+representation:
+  terms:
+    - { name: "approval", type: "bool" }
+    - { name: "directive", type: "string" }
+  states:
+    - { name: "monitoring" }
+    - { name: "intervening" }
+  predicates:
+    - { name: "engaged", expr: "approval || directive != ''" }
+  success:
+    - { name: "oversight_active", expr: "engaged" }
+
+# D - Decision space
+decisions:
+  - id: "approve_abort"
+    description: "Approve or deny a mission abort requested by the mission planner."
+    options: { type: "enum", values: ["approve", "deny"] }
+    locality: "local"
+
+# A - Action space
+actions:
+  - id: "issue_directive"
+    mode: "execute"
+    effect: "issue an overriding directive to the mission planner"
+    target: "mission-planner"

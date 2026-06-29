@@ -1,0 +1,102 @@
+aca_version: "0.1"
+kind: "Charter"
+object:
+  id: "nav-planner"
+  role: "Navigation Planner"
+  binds_agent:
+    a2a_card: "https://drone-7.example/agents/nav/agent-card.json"
+    agent_id: "drone-7/nav"
+
+# R - Representation space
+representation:
+  terms:
+    - { name: "eta", type: "duration", unit: "s" }
+    - { name: "deadline", type: "timestamp" }
+    - { name: "route_risk", type: "real", range: [0, 1] }
+    - { name: "energy_cost", type: "real", unit: "Wh" }
+    - { name: "reserve", type: "real", unit: "Wh" }
+    - { name: "target_reached", type: "bool" }
+  states:
+    - { name: "planning" }
+    - { name: "executing" }
+    - { name: "blocked" }
+  events:
+    - { name: "obstacle_detected", carries: ["route_risk"] }
+    - { name: "target_reached_evt", carries: ["target_reached"] }
+  predicates:
+    - { name: "on_time", expr: "eta <= duration(deadline - now)" }
+  success:
+    - { name: "leg_ok", expr: "target_reached && on_time" }
+
+# D - Decision space
+decisions:
+  - id: "choose_route"
+    description: "Select among feasible routes to the target."
+    options: { type: "set", over: "route" }
+    locality: "local"
+    preconditions: ["state == 'planning'"]
+    governed_by: ["risk_budget", "energy_commitment"]
+
+# A - Action space
+actions:
+  - id: "send_waypoints"
+    mode: "execute"
+    effect: "emit a waypoint sequence to the motion controller"
+    target: "motion-controller"
+    realizes_decision: "choose_route"
+  - id: "request_energy_reserve"
+    mode: "request"
+    effect: "ask the energy manager to commit a reserve for the leg"
+    target: "energy-manager"
+
+# C - Constraint space
+constraints:
+  - id: "risk_budget"
+    expr: "route_risk <= 0.2"
+    scope: "local"
+    owner: "nav-planner"
+    severity: "hard"
+  - id: "energy_commitment"
+    expr: "energy_cost <= reserve"
+    scope: "shared"
+    owner: "energy-manager"
+    shared_with: ["nav-planner"]
+    severity: "hard"
+  - id: "deadline_commitment"
+    expr: "on_time"
+    scope: "inherited"
+    owner: "mission-planner"
+    severity: "hard"
+
+# E - Exposure functions
+exposure:
+  - to: "mission-planner"
+    view: ["eta", "leg_ok"]
+    trigger: "on_change"
+  - to: "energy-manager"
+    view: ["energy_cost"]
+    trigger: "on_request"
+
+# F - Refinement / delegation relation
+delegation:
+  - delegates: "leg_ok"
+    to: ["motion-controller"]
+    objective: "follow the waypoint corridor to the target"
+    authority_boundary:
+      may_decide: ["choose_velocity_profile"]
+      may_not: ["change_target"]
+    reporting: ["tracking_error", "position"]
+    escalation_conditions: ["tracking_error > 0.5"]
+
+# X - Escalation policy
+escalation:
+  - id: "risk_exceeded"
+    when: "route_risk > 0.2"
+    to: ["mission-planner"]
+    projection:
+      mission-planner: ["eta", "leg_ok"]
+    action: "request_help"
+  - id: "deadline_infeasible"
+    when: "!on_time"
+    to: ["mission-planner", "human-supervisor"]
+    action: "transfer_authority"

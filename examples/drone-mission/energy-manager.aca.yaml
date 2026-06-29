@@ -1,0 +1,67 @@
+aca_version: "0.1"
+kind: "Charter"
+object:
+  id: "energy-manager"
+  role: "Energy Manager"
+
+# R - Representation space
+representation:
+  terms:
+    - { name: "soc", type: "real", range: [0, 1] }
+    - { name: "reserve", type: "real", unit: "Wh" }
+    - { name: "draw_rate", type: "real", unit: "W" }
+    - { name: "low_threshold", type: "real", range: [0, 1] }
+  states:
+    - { name: "nominal" }
+    - { name: "conserving" }
+    - { name: "critical" }
+  events:
+    - { name: "low_power", carries: ["soc"] }
+  predicates:
+    - { name: "healthy", expr: "soc >= low_threshold" }
+  success:
+    - { name: "power_sustained", expr: "healthy" }
+
+# D - Decision space
+decisions:
+  - id: "allocate_reserve"
+    description: "Commit an energy reserve in response to a navigation request."
+    options: { type: "interval", over: "reserve" }
+    locality: "local"
+    governed_by: ["min_reserve"]
+
+# A - Action space
+actions:
+  - id: "grant_reserve"
+    mode: "execute"
+    effect: "grant a committed reserve to the navigation planner"
+    target: "nav-planner"
+    realizes_decision: "allocate_reserve"
+  - id: "notify_low_power"
+    mode: "request"
+    effect: "notify the mission planner of degraded power"
+    target: "mission-planner"
+
+# C - Constraint space
+constraints:
+  - id: "min_reserve"
+    expr: "soc >= low_threshold"
+    scope: "local"
+    owner: "energy-manager"
+    severity: "hard"
+
+# E - Exposure functions
+exposure:
+  - to: "nav-planner"
+    view: ["reserve"]
+    trigger: "on_request"
+  - to: "mission-planner"
+    view: ["soc"]
+    trigger: "on_change"
+
+# X - Escalation policy
+escalation:
+  - id: "critical_power"
+    when: "soc < low_threshold"
+    to: ["mission-planner", "human-supervisor"]
+    action: "stop"

@@ -1,0 +1,71 @@
+aca_version: "0.1"
+kind: "Charter"
+object:
+  id: "motion-controller"
+  role: "Motion Controller"
+
+# R - Representation space
+representation:
+  terms:
+    - { name: "tracking_error", type: "real", unit: "m" }
+    - { name: "corridor_width", type: "real", unit: "m" }
+    - { name: "velocity", type: "real", unit: "m/s" }
+    - { name: "position", type: "geo.point" }
+  states:
+    - { name: "idle" }
+    - { name: "tracking" }
+    - { name: "halted" }
+  events:
+    - { name: "waypoint_passed" }
+  predicates:
+    - { name: "within_corridor", expr: "tracking_error <= corridor_width" }
+  success:
+    - { name: "leg_followed", expr: "within_corridor" }
+
+# D - Decision space
+decisions:
+  - id: "choose_velocity_profile"
+    description: "Pick a velocity profile that keeps the drone in the corridor."
+    options: { type: "interval", over: "velocity" }
+    locality: "local"
+    governed_by: ["velocity_limit", "corridor_keep"]
+
+# A - Action space
+actions:
+  - id: "set_actuator"
+    mode: "execute"
+    effect: "command actuator setpoints for the chosen velocity profile"
+    realizes_decision: "choose_velocity_profile"
+  - id: "halt"
+    mode: "block"
+    effect: "stop motion when the corridor cannot be held"
+    governed_by: ["corridor_keep"]
+
+# C - Constraint space
+constraints:
+  - id: "velocity_limit"
+    expr: "velocity <= 5.0"
+    scope: "local"
+    owner: "motion-controller"
+    severity: "hard"
+  - id: "corridor_keep"
+    expr: "within_corridor"
+    scope: "inherited"
+    owner: "nav-planner"
+    severity: "hard"
+
+# E - Exposure functions
+exposure:
+  - to: "nav-planner"
+    view: ["tracking_error", "position"]
+    trigger: "periodic"
+    period: "0.2s"
+
+# X - Escalation policy
+escalation:
+  - id: "lost_tracking"
+    when: "tracking_error > 0.5"
+    to: ["nav-planner"]
+    projection:
+      nav-planner: ["tracking_error", "position"]
+    action: "request_help"

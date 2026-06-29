@@ -1,0 +1,82 @@
+aca_version: "0.1"
+kind: "Charter"
+object:
+  id: "mission-planner"
+  role: "Mission Planner"
+
+# R - Representation space
+representation:
+  terms:
+    - { name: "mission_deadline", type: "timestamp" }
+    - { name: "mission_eta", type: "duration", unit: "s" }
+    - { name: "target", type: "geo.region" }
+    - { name: "target_reached", type: "bool" }
+    - { name: "risk_tolerance", type: "real", range: [0, 1] }
+  states:
+    - { name: "planning" }
+    - { name: "executing" }
+    - { name: "complete" }
+    - { name: "aborted" }
+  events:
+    - { name: "leg_reported" }
+    - { name: "mission_done", carries: ["target_reached"] }
+  predicates:
+    - { name: "mission_on_time", expr: "mission_eta <= duration(mission_deadline - now)" }
+  success:
+    - { name: "mission_complete", expr: "target_reached && mission_on_time" }
+
+# D - Decision space
+decisions:
+  - id: "choose_plan"
+    description: "Select a feasible inspection plan for the target region."
+    options: { type: "set", over: "plan" }
+    locality: "local"
+    preconditions: ["state == 'planning'"]
+    governed_by: ["deadline_budget"]
+  - id: "abort_mission"
+    options: { type: "enum", values: ["continue", "abort"] }
+    locality: "approval"
+    approver: "human-supervisor"
+    governed_by: ["deadline_budget"]
+
+# A - Action space
+actions:
+  - id: "delegate_leg"
+    mode: "delegate"
+    effect: "hand a navigation leg to the navigation planner"
+    target: "nav-planner"
+    realizes_decision: "choose_plan"
+
+# C - Constraint space
+constraints:
+  - id: "deadline_budget"
+    expr: "mission_on_time"
+    scope: "local"
+    owner: "mission-planner"
+    severity: "hard"
+
+# E - Exposure functions
+exposure:
+  - to: "human-supervisor"
+    view: ["mission_eta", "mission_complete"]
+    trigger: "on_change"
+
+# F - Refinement / delegation relation
+delegation:
+  - delegates: "mission_complete"
+    to: ["nav-planner"]
+    objective: "reach the target region safely before the mission deadline"
+    authority_boundary:
+      may_decide: ["choose_route"]
+      may_not: ["abort_mission"]
+    reporting: ["eta", "leg_ok"]
+    escalation_conditions: ["!mission_on_time"]
+
+# X - Escalation policy
+escalation:
+  - id: "mission_infeasible"
+    when: "!mission_on_time"
+    to: ["human-supervisor"]
+    projection:
+      human-supervisor: ["mission_eta", "mission_complete"]
+    action: "transfer_authority"

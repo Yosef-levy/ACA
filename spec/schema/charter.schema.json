@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aca-spec.org/schema/0.1/charter.schema.json",
+  "title": "ACA Charter",
+  "description": "An ACA charter places one autonomy object o = (R, D, A, C, E, F, X) into a role inside a system.",
+  "type": "object",
+  "required": ["aca_version", "kind", "object", "representation"],
+  "additionalProperties": false,
+  "properties": {
+    "aca_version": { "const": "0.1" },
+    "kind": { "const": "Charter" },
+    "object": { "$ref": "#/$defs/objectHeader" },
+    "representation": { "$ref": "#/$defs/representation" },
+    "decisions": { "type": "array", "items": { "$ref": "#/$defs/decision" } },
+    "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
+    "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } },
+    "exposure": { "type": "array", "items": { "$ref": "#/$defs/exposure" } },
+    "delegation": { "type": "array", "items": { "$ref": "#/$defs/delegation" } },
+    "escalation": { "type": "array", "items": { "$ref": "#/$defs/escalation" } }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$"
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+      "description": "A name declared in representation (term, state, event, predicate, or success)."
+    },
+    "celExpr": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A CEL expression evaluated against the R declaration environment."
+    },
+    "objectHeader": {
+      "type": "object",
+      "required": ["id", "role"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "role": { "type": "string" },
+        "binds_agent": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "a2a_card": { "type": "string", "format": "uri" },
+            "agent_id": { "type": "string" }
+          }
+        }
+      }
+    },
+    "representation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "terms": { "type": "array", "items": { "$ref": "#/$defs/term" } },
+        "states": { "type": "array", "items": { "$ref": "#/$defs/named" } },
+        "events": { "type": "array", "items": { "$ref": "#/$defs/event" } },
+        "predicates": { "type": "array", "items": { "$ref": "#/$defs/namedExpr" } },
+        "success": { "type": "array", "items": { "$ref": "#/$defs/namedExpr" } }
+      }
+    },
+    "term": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/symbol" },
+        "type": {
+          "type": "string",
+          "description": "A base type (real, int, bool, string, duration, timestamp, enum) or a namespaced abstract type (e.g. geo.region)."
+        },
+        "unit": { "type": "string" },
+        "range": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "values": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Allowed values when type is enum."
+        }
+      }
+    },
+    "named": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/symbol" },
+        "description": { "type": "string" }
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/symbol" },
+        "carries": { "type": "array", "items": { "$ref": "#/$defs/symbol" } },
+        "description": { "type": "string" }
+      }
+    },
+    "namedExpr": {
+      "type": "object",
+      "required": ["name", "expr"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/symbol" },
+        "expr": { "$ref": "#/$defs/celExpr" },
+        "description": { "type": "string" }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": ["id", "options", "locality"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "description": { "type": "string" },
+        "options": { "$ref": "#/$defs/options" },
+        "locality": { "enum": ["local", "approval", "shared"] },
+        "approver": { "$ref": "#/$defs/identifier" },
+        "preconditions": { "type": "array", "items": { "$ref": "#/$defs/celExpr" } },
+        "governed_by": { "type": "array", "items": { "$ref": "#/$defs/identifier" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "locality": { "const": "approval" } } },
+          "then": { "required": ["approver"] }
+        }
+      ]
+    },
+    "options": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["set", "enum", "interval", "bool"] },
+        "over": { "type": "string", "description": "A term name or type the options range over (for set/interval)." },
+        "values": { "type": "array", "items": { "type": "string" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "enum" } } },
+          "then": { "required": ["values"] }
+        }
+      ]
+    },
+    "action": {
+      "type": "object",
+      "required": ["id", "mode"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "mode": { "enum": ["execute", "request", "block", "delegate", "escalate"] },
+        "effect": { "type": "string" },
+        "target": { "$ref": "#/$defs/identifier" },
+        "realizes_decision": { "$ref": "#/$defs/identifier" },
+        "governed_by": { "type": "array", "items": { "$ref": "#/$defs/identifier" } }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "required": ["id", "expr", "scope", "owner"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "expr": { "$ref": "#/$defs/celExpr" },
+        "scope": { "enum": ["local", "inherited", "shared"] },
+        "owner": { "$ref": "#/$defs/identifier" },
+        "severity": { "enum": ["hard", "soft"], "default": "hard" },
+        "shared_with": { "type": "array", "items": { "$ref": "#/$defs/identifier" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "scope": { "const": "shared" } } },
+          "then": { "required": ["shared_with"] }
+        }
+      ]
+    },
+    "exposure": {
+      "type": "object",
+      "required": ["to", "view", "trigger"],
+      "additionalProperties": false,
+      "properties": {
+        "to": { "$ref": "#/$defs/identifier" },
+        "view": { "type": "array", "items": { "$ref": "#/$defs/symbol" }, "minItems": 1 },
+        "trigger": { "enum": ["periodic", "on_change", "on_request"] },
+        "period": { "type": "string", "description": "Required when trigger is periodic (e.g. '1s')." }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "trigger": { "const": "periodic" } } },
+          "then": { "required": ["period"] }
+        }
+      ]
+    },
+    "delegation": {
+      "type": "object",
+      "required": ["delegates", "to", "objective"],
+      "additionalProperties": false,
+      "properties": {
+        "delegates": { "$ref": "#/$defs/symbol" },
+        "to": { "type": "array", "items": { "$ref": "#/$defs/identifier" }, "minItems": 1 },
+        "objective": { "type": "string" },
+        "authority_boundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "may_decide": { "type": "array", "items": { "$ref": "#/$defs/identifier" } },
+            "may_not": { "type": "array", "items": { "$ref": "#/$defs/identifier" } }
+          }
+        },
+        "reporting": { "type": "array", "items": { "$ref": "#/$defs/symbol" } },
+        "escalation_conditions": { "type": "array", "items": { "$ref": "#/$defs/celExpr" } }
+      }
+    },
+    "escalation": {
+      "type": "object",
+      "required": ["id", "when", "to", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "when": { "$ref": "#/$defs/celExpr" },
+        "to": { "type": "array", "items": { "$ref": "#/$defs/identifier" }, "minItems": 1 },
+        "projection": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/symbol" }
+          }
+        },
+        "action": { "enum": ["request_help", "transfer_authority", "stop", "expose"] }
+      }
+    }
+  }
+}
